@@ -1,6 +1,6 @@
 /**
  * Asia Live Action provider for Nuvio
- * v0.1.4
+ * v0.1.5
  *
  * Evidence-based changes:
  * - Direct modern URL lookup by TMDB id before WordPress search.
@@ -60,8 +60,16 @@ function absoluteUrl(url, base) {
   }
   var m=v.match(/^(https?:\/\/)([^/?#]+)([^?#]*)([?#].*)?$/i);
   if(!m || /@|%/.test(m[2])) return null;
-  var host=m[2].toLowerCase().replace(/:\d+$/,'');
-  if(host==='localhost'||/\.localhost$|\.local$/.test(host)||/^\[|^\d+(?:\.\d+)*$|^0x/i.test(host)) return null;
+  var authority=m[2].toLowerCase();
+  // Reject ambiguous or non-public network authorities before making any request.
+  if(!/^[a-z0-9.-]+(?::\d{1,5})?$/.test(authority)) return null;
+  var port=authority.match(/:(\d{1,5})$/);
+  if(port && (Number(port[1])<1 || Number(port[1])>65535)) return null;
+  var host=authority.replace(/:\d+$/,'');
+  if(!host || host.slice(-1)==='.' || host.indexOf('..')!==-1 ||
+     /(?:^|\.)(?:localhost|local|lan|internal)$/.test(host) ||
+     /(?:^|\.)home\.arpa$/.test(host) ||
+     /^\d+(?:\.\d+)*$|^0x/i.test(host)) return null;
   var parts=m[3].split('/'), clean=[];
   for(var i=0;i<parts.length;i++) {
     if(parts[i]==='..') clean.pop();
@@ -89,6 +97,13 @@ async function getPage(url, referer, ctx, json) {
     if(!response || !response.ok) { record(ctx,"http_error",url,response&&response.status); return null; }
     var finalUrl=absoluteUrl(response.url||url,url);
     if(!finalUrl) { record(ctx,"invalid_redirect"); return null; }
+    var mime='';
+    try { mime=response.headers && typeof response.headers.get==='function' ?
+      String(response.headers.get('content-type')||'').toLowerCase() : ''; } catch (_) {}
+    // A redirected video is already a stream. Do not read a large media body as HTML.
+    // A .mp4/.m3u8 URL actually serving HTML is not a playable stream.
+    if(!json && mediaUrl(finalUrl) && !/(?:text\/html|application\/xhtml\+xml|application\/json)/.test(mime))
+      return {url:finalUrl,body:'',directMedia:true};
     var body=await response.text();
     if(body.length>MAX_BODY_CHARS) { record(ctx,"body_too_large",finalUrl); return null; }
     return {url:finalUrl,body:body};
@@ -282,6 +297,7 @@ async function resolvePage(url,referer,depth,visited,ctx) {
   visited[url]=true;
   if(mediaUrl(url)) return [{url:url,referer:referer,type:typeFromUrl(url),quality:quality(url)}];
   var page=await getPage(url,referer,ctx); if(!page) return [];
+  if(page.directMedia) return [{url:page.url,referer:referer,type:typeFromUrl(page.url),quality:quality(page.url)}];
   var d=directMedia(page.body,page.url),out=[];
   for(var i=0;i<d.length;i++) out.push({url:d[i],referer:page.url,type:typeFromUrl(d[i]),quality:quality(d[i])});
   if(out.length) return out;
@@ -327,7 +343,7 @@ async function getStreams(tmdbId,mediaType,season,episode) {
 // Explicit diagnostics for maintainers; never disguised as playable video rows.
 async function diagnose(tmdbId,mediaType,season,episode) {
   var ctx=context(),streams=await lookup(tmdbId,mediaType,season,episode,ctx);
-  return {version:"0.1.4",streamCount:streams.length,requests:ctx.requests,events:ctx.events};
+  return {version:"0.1.5",streamCount:streams.length,requests:ctx.requests,events:ctx.events};
 }
 if(typeof module!=="undefined"&&module.exports) {
   module.exports={getStreams:getStreams,diagnose:diagnose,_test:{slugify:slugify,

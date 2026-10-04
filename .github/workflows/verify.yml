@@ -16,3 +16,20 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm run check
+      - name: Verify anonymous installation URLs
+        if: github.event_name == 'push'
+        env:
+          REPO: ${{ github.repository }}
+          REV: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in manifest.json providers/asialiveaction.js; do
+            curl --fail --location --silent --show-error --max-time 20 \
+              --retry 5 --retry-delay 2 --retry-all-errors \
+              "https://raw.githubusercontent.com/$REPO/$REV/$file" \
+              --output "/tmp/$(basename "$file")"
+            test -s "/tmp/$(basename "$file")"
+          done
+          node -e 'const fs=require("fs");const m=JSON.parse(fs.readFileSync("/tmp/manifest.json","utf8"));if(!m.scrapers?.some(x=>x.filename==="providers/asialiveaction.js"))process.exit(1)'
+

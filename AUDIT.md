@@ -80,3 +80,19 @@ El historial anterior no se importa; la base y la evidencia anterior quedan iden
 La cuenta anterior y su manifiesto devolvían HTTP 404 sin sesión; el acceso autorizado no era
 una verificación suficiente para la instalación. En adelante se debe comprobar también el acceso
 anónimo HTTP al manifiesto y al archivo del proveedor antes de entregar la URL.
+
+## Auditoría incremental 0.1.5 — 2026-10-04
+
+- **Fallo reproducible en fixtures:** si un player devuelve HTTP 302 hacia un enlace HLS/MP4,
+  el extractor seguía tratando la respuesta final como HTML y perdía el vídeo.
+  Se detecta el tipo de la URL final y se devuelve como stream sin leer el cuerpo binario.
+  Los destinos con `Content-Type: text/html` o JSON no se presentan como vídeos.
+- Se restringen autoridades y hosts inválidos/locales en las URLs de entrada y salida.
+  **Límite:** el motor HTTP que sigue redirects automáticamente puede alcanzar un destino
+  intermedio antes de que este proveedor inspeccione `response.url`. Evitar esto del
+  todo requeriría transporte que permita controlar manualmente cada salto; no se afirma
+  defensa completa frente a DNS rebinding ni a redirecciones a redes privadas.
+- Se añaden pruebas de regresión de ambos casos y un chequeo en CI de que los dos
+  archivos de instalación sean accesibles por URL `raw.githubusercontent.com` anclada al commit.
+- No se añadieron adaptadores no verificados para Byse/UPN/RPM/Ezplayer; vídeo y audio
+  **en dispositivo** siguen pendientes de comprobación real.

@@ -188,3 +188,39 @@ test('direct sources never exceed six returned streams',async()=>{
   const r=routes();r[iframe]=Array.from({length:50},(_,i)=>'<source src="https://cdn.example/v'+i+'.mp4">').join('');
   const {p}=runtime(r);assert.equal((await p.getStreams('670','movie')).length,6);
 });
+
+test('redirect to real HLS is returned without reading a binary media response',async()=>{
+  const r=routes();let read=false;
+  const redirected='https://cdn.example/media/master.m3u8?token=secret';
+  r[player]=()=>({ok:true,status:200,url:redirected,
+    headers:{get:()=> 'application/vnd.apple.mpegurl'},
+    text:()=>{read=true;throw new Error('media must not be read as HTML');}});
+  const {p}=runtime(r);const streams=await p.getStreams('670','movie');
+  assert.equal(streams.length,1);
+  assert.equal(streams[0].url,redirected);
+  assert.equal(streams[0].type,'hls');
+  assert.equal(streams[0].headers.Referer,detail);
+  assert.equal(read,false);
+});
+test('redirect to HTML disguised as mp4 is not a playable stream',async()=>{
+  const r=routes();let read=false;
+  r[player]=()=>({ok:true,status:200,url:'https://cdn.example/watch.mp4',
+    headers:{get:()=> 'text/html; charset=utf-8'},
+    text:async()=>{read=true;return '<html><body>access denied</body></html>';}});
+  const {p}=runtime(r);assert.equal((await p.getStreams('670','movie')).length,0);
+  assert.equal(read,true);
+});
+test('unsafe final redirects are rejected and never become streams',async()=>{
+  for(const u of ['http://localhost:8080/p.mp4','http://10.0.0.3/p.m3u8','https://private.internal/file.mp4']) {
+    const r=routes();r[player]={url:u,body:'<source src="'+media+'">'};
+    const {p}=runtime(r);assert.equal((await p.getStreams('670','movie')).length,0,u);
+  }
+});
+test('host validation rejects non-public or invalid URL authority',()=>{
+  for(const u of ['https://site.internal/a','http://host.lan/a','https://home.arpa/a',
+    'http://localhost./a','http://foo..example/a','https://example.com:65536/a',
+    'https://example.com:abc/a','http://[::ffff:127.0.0.1]/a']) {
+    assert.equal(helpers.absoluteUrl(u,BASE),null,u);
+  }
+  assert.equal(helpers.absoluteUrl('https://cdn.example:8443/v.m3u8',BASE),'https://cdn.example:8443/v.m3u8');
+});
