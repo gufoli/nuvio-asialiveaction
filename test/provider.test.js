@@ -23,7 +23,7 @@ function runtime(routes = {}, options = {}) {
       if (value instanceof Error) throw value;
       if (typeof value === 'function') return value(url, init);
       const row = typeof value === 'string' ? {body:value} : value || {status:404};
-      return {ok:(row.status || 200)===200,status:row.status||200,url:row.url||url,text:async()=>row.body||''};
+      return {ok:(row.status || 200)===200,status:row.status||200,url:row.url||url,headers:row.headers||null,text:row.text|| (async()=>row.body||'')};
     }
   };
   if (!options.noURL) sandbox.URL = URL;
