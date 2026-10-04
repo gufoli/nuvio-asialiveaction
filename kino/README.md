@@ -1,7 +1,8 @@
 # Asia Live Action para Kino — experimental
 
-Esta carpeta es un plugin **nativo de Kino 0.9.50+**, separado del scraper de Nuvio que vive en la
-raíz del repositorio.
+Esta carpeta es un plugin **nativo de Kino 0.9.50+ / apiVersion 6**, separado del scraper de Nuvio.
+**No es instalable en la versión pública actual de Kino comprobada el 2026-10-04**, cuyo código y
+contrato publicados admiten hasta apiVersion 5. Se conserva como trabajo futuro.
 
 ## Por qué existe
 
@@ -30,11 +31,13 @@ El manifiesto se valida en CI contra una revisión fijada del SDK oficial de Kin
 SDK recuerda que `kino.browser.capture` y `kino.browser.page` solo pueden verificarse dentro de la
 app, por lo que la reproducción sigue marcada como pendiente hasta la primera prueba en Android.
 
-## Instalación cuando llegue a main
+## Instalación futura
 
-En Kino: Ajustes ▸ Plugins ▸ Agregar plugin y pega:
+No intentes instalar esta carpeta todavía. El Kino público actual responde correctamente:
+`Este plugin necesita una versión más nueva de Kino`.
+
+Cuando la app pública soporte realmente apiVersion 6, la dirección prevista será:
 
 `https://github.com/gufoli/nuvio-asialiveaction/tree/main/kino`
 
-La instalación pedirá permiso para abrir páginas web ocultas y para reproducir vídeo desde el servidor
-público que indique la página. Es esperado para este diseño.
+Hasta entonces la ruta soportada es el repositorio Nuvio de la raíz.
