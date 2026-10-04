@@ -1,6 +1,6 @@
 {
   "name": "Asia Live Action",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Proveedor no oficial. Búsqueda exacta, servidores allVideos y diagnóstico separado.",
   "author": "Community",
   "scrapers": [
@@ -8,7 +8,7 @@
       "id": "asialiveaction",
       "name": "Asia Live Action",
       "description": "Películas y series asiáticas. Solo streams directos compatibles; algunos hosts dinámicos no están soportados.",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "author": "Community",
       "supportedTypes": [
         "movie",

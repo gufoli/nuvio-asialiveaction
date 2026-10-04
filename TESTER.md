@@ -1,10 +1,10 @@
-# Pruebas en Nuvio — 0.1.4
+# Pruebas en Nuvio — 0.1.5
 
 No hace falta tocar GitHub ni ejecutar comandos.
 
 1. Si tienes instalada la entrada antigua de `man-zanilla`, elimina solo esa entrada y añade:
    `https://raw.githubusercontent.com/gufoli/nuvio-asialiveaction/main/manifest.json`
-   Confirma **0.1.4**. Las siguientes actualizaciones se harán desde esta nueva entrada.
+   Confirma **0.1.5**. Las siguientes actualizaciones se harán desde esta nueva entrada.
 2. Abre **Oldboy (2003)** y busca fuentes. Indica si aparecen fuentes de Asia Live Action.
    Actualmente sus hosts dinámicos no están soportados: cero fuentes es una limitación conocida,
    no prueba de que el repositorio no se haya instalado.

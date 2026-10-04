@@ -1,4 +1,4 @@
-# Asia Live Action — Nuvio 0.1.4
+# Asia Live Action — Nuvio 0.1.5
 
 Proveedor no oficial, sin dependencias. Busca por identidad TMDB y por temporada/episodio exactos.
 
@@ -12,7 +12,7 @@ https://raw.githubusercontent.com/gufoli/nuvio-asialiveaction/main/manifest.json
 
 Si vienes del repositorio de `man-zanilla`, elimina **solo ese repositorio** de Nuvio y añade la URL de `gufoli` indicada arriba. Actualizar la entrada antigua seguirá consultando la cuenta anterior.
 
-Si ya está instalado desde `gufoli`, actualizar el repositorio y comprobar que el proveedor muestra **0.1.4**.
+Si ya está instalado desde `gufoli`, actualizar el repositorio y comprobar que el proveedor muestra **0.1.5**.
 Si conserva 0.1.2, quitar únicamente este repositorio y añadir la misma URL de nuevo.
 No es necesario descargar ZIP, copiar código ni modificar GitHub.
 
@@ -25,6 +25,8 @@ La compatibilidad real con Kino queda pendiente; no se ha probado en ese runtime
 - Prueba varios enlaces de reproducción del mismo título/episodio cuando están disponibles.
 - Rechaza otros TMDB, temporadas, episodios, hosts falsos y redirecciones de identidad incorrecta.
 - Resuelve rutas relativas contra la URL final y conserva los parámetros de los streams.
+- Reconoce redirecciones directas hacia HLS/MP4 sin descargar el vídeo como HTML y rechaza destinos HTML disfrazados de vídeo.
+- Endurece la validación de hosts y prueba la disponibilidad pública de los archivos de instalación en GitHub Actions.
 - No devuelve diagnósticos ni páginas HTML como supuestos vídeos; TMDB 603 es un título normal.
 - No inventa calidad HD ni afirma idioma/subtítulos que el extractor no ha comprobado.
 - Diagnóstico sin API keys, tokens, cuerpos HTML ni URLs completas en logs.
