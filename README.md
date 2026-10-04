@@ -87,3 +87,16 @@ chequeo no invasivo de la ficha pública de Oldboy y, solo si es accesible,
 de una página de reproductor. También puede iniciarse manualmente desde
 Actions. Solo publica códigos HTTP y nombres de hosts; `success` significa
 que la inspección se ejecutó, no que el vídeo funcione.
+
+
+## Variante nativa de Kino (experimental)
+
+La carpeta `kino/` contiene un plugin nativo separado para **Kino 0.9.50+**. No sustituye ni modifica
+el scraper de Nuvio. Su objetivo es resolver los reproductores dinámicos de Asia Live Action con
+`kino.browser.capture`: Kino abre la página pública del reproductor en una WebView oculta y devuelve
+las peticiones multimedia que la propia página realiza, con sus cabeceras. El plugin no ejecuta con
+`eval` ni `new Function` el JavaScript descargado de los servidores.
+
+Primera etapa: películas. Series se añadirán únicamente después de verificar la reproducción real en
+un dispositivo. El kit oficial de Kino valida manifiesto y contrato en CI, pero el navegador oculto
+solo puede comprobarse dentro de la app.
