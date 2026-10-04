@@ -148,3 +148,29 @@ mismo estado HTTP, porque pueden existir diferencias de red o acceso.
 El siguiente paso real sigue siendo obtener acceso público normal y
 autorizado a reproductores verificables. No se intentará sortear medidas
 anti-bot, DRM, autenticación o restricciones del sitio.
+
+
+## Aprendizaje de plugins Kino — 2026-10-04
+
+Se revisó la documentación actual de `kinotvapp/kino-plugins`, el plugin Cuevana3k 2.1.2 de
+`ice-dev-x/cu3v4n4` y el plugin Maratón de `xuper-plugin/maraton`.
+
+- Cuevana3k confirma la utilidad de `streamHosts: "any"` cuando los CDN cambian, pero su extractor
+  desempaqueta JavaScript de algunos hosts. Esa técnica no se incorpora: este proyecto mantiene la
+  regla de no ejecutar JavaScript descargado.
+- Maratón usa el mecanismo más adecuado para reproductores dinámicos: `kino.browser.capture`.
+  La página corre en la WebView aislada de Kino y el plugin recibe las peticiones reales de vídeo,
+  junto con Referer/User-Agent/Origin/Cookie cuando corresponden.
+- La conversión automática Nuvio→Kino conserva `getStreams`, aumenta límites y permite hosts
+  públicos, pero genera un plugin apiVersion 4 y no aporta por sí misma el navegador oculto de
+  apiVersion 6. Por ello no resuelve nuestro bloqueo actual con players que construyen el stream
+  mediante JavaScript.
+- Se añadió una variante **nativa de Kino**, separada en `kino/`, que primero intenta lectura HTTP y
+  ante 403/verificación usa `kino.browser.page`; al reproducir, abre únicamente reproductores
+  exactos `/f/.../<TMDB>/...` del mismo sitio y usa `kino.browser.capture`. No abre una URL
+  multimedia a ciegas ni ejecuta scripts remotos dentro de QuickJS.
+- La primera versión nativa cubre solo películas para mantener una ruta de prueba pequeña y
+  verificable. Series quedan fuera hasta confirmar la salida audiovisual real.
+
+Evidencia automatizada: 7/7 pruebas de comportamiento y validación con el SDK oficial sincronizado
+con Kino 0.9.50: **“Kino would accept this plugin”**. Pendiente real: WebView/reproducción en dispositivo.
