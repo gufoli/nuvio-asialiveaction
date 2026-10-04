@@ -1,6 +1,6 @@
 /**
  * Asia Live Action provider for Nuvio
- * v0.1.6
+ * v0.1.7
  *
  * Evidence-based changes:
  * - Direct modern URL lookup by TMDB id before WordPress search.
@@ -77,9 +77,12 @@ function absoluteUrl(url, base) {
   }
   return m[1].toLowerCase()+m[2].toLowerCase()+'/'+clean.join('/')+(m[3].slice(-1)==='/'&&clean.length?'/':'')+(m[4]||'');
 }
-function headers(referer, accept) {
+function headers(referer, accept, extra) {
   var h = {"User-Agent":ALA_UA, "Accept":accept || "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"};
   if (referer) h["Referer"] = referer;
+  if (extra && typeof extra === "object") Object.keys(extra).forEach(function(key) {
+    if (extra[key] != null) h[key] = String(extra[key]);
+  });
   return h;
 }
 
@@ -87,7 +90,7 @@ var MAX_REDIRECTS = 4;
 // The Nuvio fetch bridge buffers response bodies before returning them to JS.
 // Follow redirects manually so an embed's Location: .../video.m3u8 never
 // downloads the entire video into the plugin runtime.
-async function getPage(url, referer, ctx, json) {
+async function getPage(url, referer, ctx, json, extraHeaders) {
   var current=absoluteUrl(url,referer), from=referer, seen=Object.create(null);
   if(!current) return null;
   for(var hop=0;hop<=MAX_REDIRECTS;hop++) {
@@ -102,7 +105,7 @@ async function getPage(url, referer, ctx, json) {
     var timer, timedOut=false;
     var target=current;
     var work=(async function() {
-      var options={headers:headers(from,json?"application/json":null),redirect:"manual"};
+      var options={headers:headers(from,json?"application/json":null,extraHeaders),redirect:"manual"};
       if(controller) options.signal=controller.signal;
       var response=await fetch(target,options);
       if(!response) { record(ctx,"network_error",target); return null; }
@@ -321,6 +324,126 @@ function iframeUrls(html,base) {
   }
   return out;
 }
+
+// Byse is a client-side player. Its public JSON endpoint returns an AES-256-GCM
+// envelope whose key parts and IV are delivered with the payload. Nuvio Full
+// already exposes browser-compatible WebCrypto backed by Android's native AES-GCM.
+// This adapter reproduces that public client flow without eval or remote JS execution.
+function b64urlBytes(value) {
+  var input=String(value||"").replace(/-/g,"+").replace(/_/g,"/");
+  while(input.length%4) input+="=";
+  var binary;
+  try { binary=atob(input); } catch (_) { return null; }
+  var out=new Uint8Array(binary.length);
+  for(var i=0;i<binary.length;i++) out[i]=binary.charCodeAt(i)&255;
+  return out;
+}
+function concatByteArrays(parts) {
+  var size=0,i,j;
+  for(i=0;i<parts.length;i++) size+=parts[i].length;
+  var out=new Uint8Array(size), offset=0;
+  for(i=0;i<parts.length;i++) {
+    for(j=0;j<parts[i].length;j++) out[offset+j]=parts[i][j];
+    offset+=parts[i].length;
+  }
+  return out;
+}
+function decodeUtf8Bytes(bytes) {
+  try {
+    if(typeof TextDecoder!=="undefined") return new TextDecoder("utf-8").decode(bytes);
+  } catch (_) {}
+  var binary="";
+  for(var i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]);
+  try { return decodeURIComponent(escape(binary)); } catch (_) { return binary; }
+}
+async function decryptBysePlayback(playback) {
+  try {
+    if(!playback||!Array.isArray(playback.key_parts)||!playback.key_parts.length) return null;
+    if(typeof crypto==="undefined"||!crypto.subtle||typeof crypto.subtle.importKey!=="function"||typeof crypto.subtle.decrypt!=="function") return null;
+    var keyParts=[];
+    for(var i=0;i<playback.key_parts.length;i++) {
+      var part=b64urlBytes(playback.key_parts[i]);
+      if(!part||!part.length) return null;
+      keyParts.push(part);
+    }
+    var keyBytes=concatByteArrays(keyParts);
+    var iv=b64urlBytes(playback.iv);
+    var payload=b64urlBytes(playback.payload);
+    if(keyBytes.length!==32||!iv||iv.length!==12||!payload||payload.length<16) return null;
+    var key=await crypto.subtle.importKey("raw",keyBytes,{name:"AES-GCM"},false,["decrypt"]);
+    var plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv,tagLength:128},key,payload);
+    var data=JSON.parse(decodeUtf8Bytes(new Uint8Array(plain)));
+    return data&&Array.isArray(data.sources) ? data : null;
+  } catch (_) { return null; }
+}
+function byseVideoId(url) {
+  var match=String(url||"").match(/^https?:\/\/[^/?#]+\/e\/([A-Za-z0-9_-]{4,128})(?:[/?#]|$)/i);
+  return match ? match[1] : null;
+}
+function originOf(url) {
+  var match=String(url||"").match(/^(https?:\/\/[^/?#]+)/i);
+  return match ? match[1] : null;
+}
+function looksLikeByse(url,html) {
+  var host=(String(url||"").match(/^https?:\/\/([^/?#]+)/i)||[])[1]||"";
+  return /(?:^|\.)byse/i.test(host)||/myvidplay/i.test(host)||/\bbyse\b|\/api\/videos\//i.test(String(html||""));
+}
+function parseJsonBody(page) {
+  if(!page||!page.body) return null;
+  try { return JSON.parse(page.body); } catch (_) { return null; }
+}
+function byseSources(decoded,base,origin) {
+  if(!decoded||!Array.isArray(decoded.sources)) return [];
+  var out=[],seen=Object.create(null);
+  for(var i=0;i<decoded.sources.length&&out.length<MAX_EMBEDS;i++) {
+    var source=decoded.sources[i];
+    var u=source&&absoluteUrl(source.url,base);
+    if(!u||!mediaUrl(u)||seen[u]) continue;
+    seen[u]=true;
+    out.push({
+      url:u,
+      referer:origin+"/",
+      origin:origin,
+      type:typeFromUrl(u),
+      quality:source.label ? String(source.label).slice(0,24) : quality(u)
+    });
+  }
+  return out;
+}
+async function resolveByse(url,referer,pageHtml,ctx) {
+  var id=byseVideoId(url),origin=originOf(url);
+  if(!id||!origin||!looksLikeByse(url,pageHtml)||ctx.stopped) return [];
+
+  // Older/current Byse frontends expose playback directly here.
+  var directApi=origin+"/api/videos/"+encodeURIComponent(id)+"/";
+  var directPage=await getPage(directApi,referer,ctx,true,{"X-Requested-With":"XMLHttpRequest"});
+  var directJson=parseJsonBody(directPage);
+  if(directJson&&directJson.playback) {
+    var directDecoded=await decryptBysePlayback(directJson.playback);
+    var directStreams=byseSources(directDecoded,url,origin);
+    if(directStreams.length) { record(ctx,"byse_resolved",url); return directStreams; }
+  }
+  if(ctx.stopped) return [];
+
+  // Newer frontend: details points to a frame, whose playback endpoint carries the envelope.
+  var detailsUrl=origin+"/api/videos/"+encodeURIComponent(id)+"/embed/details";
+  var detailsPage=await getPage(detailsUrl,referer,ctx,true);
+  var details=parseJsonBody(detailsPage);
+  var frame=details&&absoluteUrl(details.embed_frame_url,detailsUrl);
+  var frameId=byseVideoId(frame);
+  var frameOrigin=originOf(frame);
+  if(!frame||!frameId||!frameOrigin) return [];
+
+  var playbackUrl=frameOrigin+"/api/videos/"+encodeURIComponent(frameId)+"/embed/playback";
+  var playbackPage=await getPage(playbackUrl,frame,ctx,true,{"X-Embed-Parent":url});
+  var playbackJson=parseJsonBody(playbackPage);
+  var playback=playbackJson&&playbackJson.playback;
+  var decoded=await decryptBysePlayback(playback);
+  var streams=byseSources(decoded,frame,frameOrigin);
+  if(streams.length) record(ctx,"byse_resolved",url);
+  return streams;
+}
+
 async function resolvePage(url,referer,depth,visited,ctx) {
   if(!url||depth>MAX_EMBED_DEPTH||ctx.stopped||visited[url]) return [];
   visited[url]=true;
@@ -330,6 +453,8 @@ async function resolvePage(url,referer,depth,visited,ctx) {
   var d=directMedia(page.body,page.url),out=[];
   for(var i=0;i<d.length;i++) out.push({url:d[i],referer:page.url,type:typeFromUrl(d[i]),quality:quality(d[i])});
   if(out.length) return out;
+  var byse=await resolveByse(page.url,referer,page.body,ctx);
+  if(byse.length) return byse;
   var frames=iframeUrls(page.body,page.url);
   if(!frames.length) record(ctx,"no_supported_media",page.url);
   for(var j=0;j<frames.length && out.length<MAX_EMBEDS;j++) {
@@ -360,9 +485,10 @@ async function lookup(tmdbId,mediaType,season,episode,ctx) {
     }
     if(!resolved.length) record(ctx,"stream_not_resolved");
     return resolved.slice(0,MAX_EMBEDS).map(function(x) {
+      var playbackHeaders={"User-Agent":ALA_UA,"Referer":x.referer};
+      if(x.origin) playbackHeaders.Origin=x.origin;
       return {name:"Asia Live Action",title:x.quality+" · Asia Live Action",url:x.url,
-        quality:x.quality,provider:"Asia Live Action",type:x.type,
-        headers:{"User-Agent":ALA_UA,"Referer":x.referer}};
+        quality:x.quality,provider:"Asia Live Action",type:x.type,headers:playbackHeaders};
     });
   } catch (_) {record(ctx,"provider_error");return [];}
 }
@@ -372,11 +498,12 @@ async function getStreams(tmdbId,mediaType,season,episode) {
 // Explicit diagnostics for maintainers; never disguised as playable video rows.
 async function diagnose(tmdbId,mediaType,season,episode) {
   var ctx=context(),streams=await lookup(tmdbId,mediaType,season,episode,ctx);
-  return {version:"0.1.6",streamCount:streams.length,requests:ctx.requests,events:ctx.events};
+  return {version:"0.1.7",streamCount:streams.length,requests:ctx.requests,events:ctx.events};
 }
 if(typeof module!=="undefined"&&module.exports) {
   module.exports={getStreams:getStreams,diagnose:diagnose,_test:{slugify:slugify,
     directCandidates:directCandidates,playbackLink:playbackLink,playbackLinks:playbackLinks,
     directMedia:directMedia,allVideos:allVideos,iframeUrls:iframeUrls,absoluteUrl:absoluteUrl,
-    exactDetailFromSearch:exactDetailFromSearch}};
+    exactDetailFromSearch:exactDetailFromSearch,decryptBysePlayback:decryptBysePlayback,
+    byseVideoId:byseVideoId,looksLikeByse:looksLikeByse}};
 }
