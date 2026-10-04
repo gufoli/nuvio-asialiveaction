@@ -1,0 +1,33 @@
+{
+  "name": "Asia Live Action",
+  "version": "0.1.4",
+  "description": "Proveedor no oficial. Búsqueda exacta, servidores allVideos y diagnóstico separado.",
+  "author": "Community",
+  "scrapers": [
+    {
+      "id": "asialiveaction",
+      "name": "Asia Live Action",
+      "description": "Películas y series asiáticas. Solo streams directos compatibles; algunos hosts dinámicos no están soportados.",
+      "version": "0.1.4",
+      "author": "Community",
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
+      "filename": "providers/asialiveaction.js",
+      "enabled": true,
+      "hasSettings": false,
+      "contentLanguage": [
+        "es"
+      ],
+      "formats": [
+        "m3u8",
+        "mp4",
+        "mkv",
+        "webm"
+      ],
+      "supportsExternalPlayer": true,
+      "limited": false
+    }
+  ]
+}

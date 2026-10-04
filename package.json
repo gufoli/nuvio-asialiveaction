@@ -1,0 +1,14 @@
+{
+  "name": "asialiveaction-nuvio-plugin",
+  "version": "0.1.4",
+  "private": true,
+  "description": "Unofficial Nuvio provider for AsiaLiveAction",
+  "scripts": {
+    "test": "node --test test/provider.test.js",
+    "check": "node --check providers/asialiveaction.js && node --test test/provider.test.js",
+    "diagnose": "node scripts/diagnose.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

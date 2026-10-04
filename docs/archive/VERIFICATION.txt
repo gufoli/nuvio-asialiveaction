@@ -1,0 +1,47 @@
+asialiveaction.js: PASS
+
+
+provider.test.js: PASS
+
+
+offline-tests: PASS
+TAP version 13
+# Subtest: Oldboy direct URL
+ok 1 - Oldboy direct URL
+  ---
+  duration_ms: 1.29205
+  type: 'test'
+  ...
+# Subtest: Good Morning Call S2 direct candidate
+ok 2 - Good Morning Call S2 direct candidate
+  ---
+  duration_ms: 0.365381
+  type: 'test'
+  ...
+# Subtest: Oldboy player link
+ok 3 - Oldboy player link
+  ---
+  duration_ms: 0.537701
+  type: 'test'
+  ...
+# Subtest: series episode link
+ok 4 - series episode link
+  ---
+  duration_ms: 0.274414
+  type: 'test'
+  ...
+# Subtest: direct HLS extraction
+ok 5 - direct HLS extraction
+  ---
+  duration_ms: 1.053039
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 52.529839
