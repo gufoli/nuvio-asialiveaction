@@ -96,3 +96,16 @@ anónimo HTTP al manifiesto y al archivo del proveedor antes de entregar la URL.
   archivos de instalación sean accesibles por URL `raw.githubusercontent.com` anclada al commit.
 - No se añadieron adaptadores no verificados para Byse/UPN/RPM/Ezplayer; vídeo y audio
   **en dispositivo** siguen pendientes de comprobación real.
+
+
+## Evidencia real en Nuvio — 2026-10-04
+
+Prueba en dispositivo Android con **Oldboy (2003)** y Asia Live Action 0.1.5:
+
+- Nuvio carga y registra correctamente el proveedor: el filtro **Asia Live Action** aparece al iniciar la búsqueda.
+- Al terminar la consulta el filtro desaparece y quedan las fuentes de otros proveedores.
+- Este comportamiento coincide con el código actual de NuvioMobile: `ProviderFilterRow` solo conserva grupos con streams o que todavía estén cargando (`it.streams.isNotEmpty() || it.isLoading`).
+- Por tanto, la desaparición **no indica desinstalación ni fallo del manifest**; demuestra que el scraper terminó con **0 streams** para Oldboy.
+- Estado real: integración Nuvio/manifest confirmada en dispositivo; extracción de los reproductores dinámicos de AsiaLiveAction sigue pendiente.
+
+No se añadirá una fila de diagnóstico falsa para mantener visible el filtro: solo se publicarán fuentes reproducibles reales.
