@@ -19,3 +19,10 @@ y captura del resultado o error. No envíes claves API ni tokens.
 El botón genérico «Proveedor de pruebas» consulta TMDB 603 (The Matrix).
 Que devuelva cero fuentes no demuestra un fallo de AsiaLiveAction: ese título puede no estar en el catálogo.
 Ya no se sustituye esa película por falsos vídeos de diagnóstico.
+
+
+## Resultado recibido — 2026-10-04
+
+**Oldboy (2003), Android, 0.1.5:** el filtro Asia Live Action aparece durante la carga y desaparece al finalizar. Nuvio oculta los proveedores que terminan con cero streams. Esto confirma que el plugin está instalado y se ejecuta; el resultado actual para Oldboy es **0 fuentes reproducibles**.
+
+No hace falta repetir esta prueba hasta que se publique un extractor de host nuevo.
