@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+const webcrypto = require('node:crypto').webcrypto;
+const { TextEncoder, TextDecoder } = require('node:util');
 const source = fs.readFileSync(require.resolve('../providers/asialiveaction.js'), 'utf8');
 const BASE = 'https://asialiveaction.com';
 const detail = BASE + '/pelicula/670-oldboy-sub-espanol/';
@@ -14,6 +16,9 @@ function runtime(routes = {}, options = {}) {
   const sandbox = {
     module: {exports:{}}, console:{info:(v)=>logs.push(v)},
     TMDB_API_KEY: options.noKey ? '' : 'private-key',
+    crypto: webcrypto, TextEncoder, TextDecoder,
+    atob: (v)=>Buffer.from(String(v),'base64').toString('binary'),
+    btoa: (v)=>Buffer.from(String(v),'binary').toString('base64'),
     setTimeout: options.fastTimers ? (fn)=>setTimeout(fn, 5) : setTimeout,
     clearTimeout,
     fetch: async (url, init) => {
@@ -41,6 +46,23 @@ function routes() {
   };
 }
 function plain(v) { return JSON.parse(JSON.stringify(v)); }
+
+function b64url(bytes) { return Buffer.from(bytes).toString('base64url'); }
+async function byseEnvelope(streamUrl, label='1080p') {
+  const keyBytes=Uint8Array.from({length:32},(_,i)=>i+1);
+  const iv=Uint8Array.from({length:12},(_,i)=>0xa0+i);
+  const key=await webcrypto.subtle.importKey('raw',keyBytes,{name:'AES-GCM'},false,['encrypt']);
+  const plainBytes=new TextEncoder().encode(JSON.stringify({
+    sources:[{url:streamUrl,label,mime_type:'application/vnd.apple.mpegurl'}],
+    tracks:[]
+  }));
+  const payload=new Uint8Array(await webcrypto.subtle.encrypt({name:'AES-GCM',iv,tagLength:128},key,plainBytes));
+  return {
+    key_parts:[b64url(keyBytes.slice(0,16)),b64url(keyBytes.slice(16))],
+    iv:b64url(iv),
+    payload:b64url(payload)
+  };
+}
 
 test('movie end-to-end preserves signed stream and playback headers', async()=>{
   const {p,calls}=runtime(routes());
@@ -169,6 +191,75 @@ test('branching embeds cannot exceed total request budget',async()=>{
   for(let i=0;i<6;i++) r['https://player.example/'+i]=Array.from({length:6},(_,j)=>'<iframe src="https://player.example/'+i+'/'+j+'">').join('');
   const {p,calls}=runtime(r);await p.getStreams('670','movie');assert.ok(calls.length<=18);
 });
+
+test('Byse legacy JSON envelope decrypts through WebCrypto without fetching the media body',async()=>{
+  const r=routes();
+  const byse='https://byse.example/e/abcd1234';
+  const byseApi='https://byse.example/api/videos/abcd1234/';
+  const final='https://cdn.example/byse/master.m3u8?token=short-lived';
+  const playback=await byseEnvelope(final,'1080p');
+  r[player]='var allVideos = '+JSON.stringify({'1385-1':[['BY',byse]]})+';';
+  r[byse]='<html><title>Byse Frontend</title><div id="app"></div></html>';
+  r[byseApi]=JSON.stringify({playback});
+  const {p,calls}=runtime(r);
+  const result=await p.getStreams('670','movie');
+  assert.equal(result.length,1);
+  assert.equal(result[0].url,final);
+  assert.equal(result[0].type,'hls');
+  assert.equal(result[0].quality,'1080p');
+  assert.equal(result[0].headers.Referer,'https://byse.example/');
+  assert.equal(result[0].headers.Origin,'https://byse.example');
+  assert.ok(calls.some(c=>c.url===byseApi));
+  assert.ok(!calls.some(c=>c.url===final),'media URL must be returned, not downloaded by the scraper');
+  assert.ok(calls.find(c=>c.url===byseApi).init.headers['X-Requested-With']==='XMLHttpRequest');
+});
+
+test('Byse newer details plus embed playback flow is supported with bounded requests',async()=>{
+  const r=routes();
+  const byse='https://byse.example/e/abcd1234';
+  const directApi='https://byse.example/api/videos/abcd1234/';
+  const detailsApi='https://byse.example/api/videos/abcd1234/embed/details';
+  const frame='https://byseframe.example/e/frame9999';
+  const playbackApi='https://byseframe.example/api/videos/frame9999/embed/playback';
+  const final='https://cdn.example/byse/new/master.m3u8';
+  const playback=await byseEnvelope(final,'720p');
+  r[player]='var allVideos = '+JSON.stringify({'1385-1':[['BY',byse]]})+';';
+  r[byse]='<html><title>Byse Frontend</title></html>';
+  r[directApi]={status:404};
+  r[detailsApi]=JSON.stringify({embed_frame_url:frame});
+  r[playbackApi]=JSON.stringify({playback});
+  const {p,calls}=runtime(r);
+  const result=await p.getStreams('670','movie');
+  assert.equal(result.length,1);
+  assert.equal(result[0].url,final);
+  assert.equal(result[0].quality,'720p');
+  assert.equal(result[0].headers.Origin,'https://byseframe.example');
+  const playbackCall=calls.find(c=>c.url===playbackApi);
+  assert.equal(playbackCall.init.headers['X-Embed-Parent'],byse);
+  assert.equal(playbackCall.init.headers.Referer,frame);
+  assert.ok(calls.length<=18);
+});
+
+test('Byse malformed crypto envelope fails closed and never invents a stream',async()=>{
+  const r=routes();
+  const byse='https://byse.example/e/abcd1234';
+  r[player]='var allVideos = '+JSON.stringify({'1385-1':[['BY',byse]]})+';';
+  r[byse]='<html><title>Byse Frontend</title></html>';
+  r['https://byse.example/api/videos/abcd1234/']=JSON.stringify({
+    playback:{key_parts:['bad'],iv:'bad',payload:'bad'}
+  });
+  r['https://byse.example/api/videos/abcd1234/embed/details']={status:404};
+  const {p}=runtime(r);
+  assert.equal((await p.getStreams('670','movie')).length,0);
+});
+
+test('Byse adapter is gated to player-shaped URLs and Byse evidence',()=>{
+  assert.equal(helpers.byseVideoId('https://byse.example/e/abcd1234'),'abcd1234');
+  assert.equal(helpers.byseVideoId('https://byse.example/watch/abcd1234'),null);
+  assert.equal(helpers.looksLikeByse('https://video.example/e/abcd1234','<html>plain</html>'),false);
+  assert.equal(helpers.looksLikeByse('https://video.example/e/abcd1234','<title>Byse Frontend</title>'),true);
+});
+
 test('manifest versions and provider path remain consistent',()=>{
   const m=require('../manifest.json'),pkg=require('../package.json');
   assert.equal(m.version,pkg.version);assert.equal(m.scrapers[0].version,pkg.version);
