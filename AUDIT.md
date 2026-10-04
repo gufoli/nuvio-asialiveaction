@@ -114,9 +114,10 @@ No se añadirá una fila de diagnóstico falsa para mantener visible el filtro: 
 
 Se ha inspeccionado el código público de NuvioMobile (FetchBridge.kt y
 JsBindings.kt, repositorio `NuvioMedia/NuvioMobile`): el puente de fetch
-materializa `response.bodyBytes` y su copia Base64 antes de entregar la
-respuesta a JavaScript. La detección de `.mp4` o `.m3u8` hecha **después**
-del `fetch` en 0.1.5 no prevenía ese consumo de memoria ante un 302.
+materializa hasta 1 MiB de `response.bodyBytes` y genera también una copia
+Base64 antes de entregar la respuesta a JavaScript. Aunque Android limita
+la respuesta a 1 MiB, la detección de `.mp4` o `.m3u8` hecha **después**
+del `fetch` en 0.1.5 no evitaba esa transferencia ni las copias en memoria.
 
 Corrección: seguir explícitamente HTTP 301/302/303/307/308 mediante
 `redirect:manual`; si Location ya es una ruta multimedia, entregarla sin
@@ -126,3 +127,5 @@ solicitarla. Nuevas pruebas de redirección y regresión.
 **Limitaciones:** el comportamiento real de hosts dinámicos, la accesibilidad
 de la CDN, los redirects ignorados por el runtime, DRM y la reproducción en
 dispositivo siguen sin verificarse. No añadir reproductores falsos.
+
+Las pruebas en Github Actions verifican el control del flujo HTTP con respuestas simuladas. No se ha conseguido acceder al contenido actual de `asialiveaction.com` desde este entorno (error de acceso al solicitar las páginas públicas), por lo que ningún reproductor nuevo puede declararse funcional. El límite de 1 MiB se aplica en la implementación Android de NuvioMobile; otras plataformas pueden comportarse de forma distinta.
