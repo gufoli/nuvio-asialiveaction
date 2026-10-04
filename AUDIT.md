@@ -129,3 +129,22 @@ de la CDN, los redirects ignorados por el runtime, DRM y la reproducción en
 dispositivo siguen sin verificarse. No añadir reproductores falsos.
 
 Las pruebas en Github Actions verifican el control del flujo HTTP con respuestas simuladas. No se ha conseguido acceder al contenido actual de `asialiveaction.com` desde este entorno (error de acceso al solicitar las páginas públicas), por lo que ningún reproductor nuevo puede declararse funcional. El límite de 1 MiB se aplica en la implementación Android de NuvioMobile; otras plataformas pueden comportarse de forma distinta.
+
+## Inspección HTTP pública desde GitHub Actions — 2026-10-04
+
+Se añadió una prueba *no bloqueante* `.github/workflows/inspect-site.yml`
+y `scripts/inspect-site.js`, limitada a la ficha de Oldboy y, solo si esta
+resulta accesible, su primer reproductor en el propio dominio. No descarga
+archivos multimedia, no accede a hosts externos y nunca registra tokens,
+cookies ni URLs firmadas. No establece reproducción real.
+
+**Ejecución GitHub Actions #37217069303:** `detailHttp=403`,
+`detailFound=false`, `playerHttp=0`, `playerFound=false`.
+El job terminó correctamente como herramienta diagnóstica: el HTTP 403
+se clasifica como **acceso denegado desde el runner**, no como éxito de la
+web ni como error del plugin. Tampoco demuestra que Android reciba el
+mismo estado HTTP, porque pueden existir diferencias de red o acceso.
+
+El siguiente paso real sigue siendo obtener acceso público normal y
+autorizado a reproductores verificables. No se intentará sortear medidas
+anti-bot, DRM, autenticación o restricciones del sitio.

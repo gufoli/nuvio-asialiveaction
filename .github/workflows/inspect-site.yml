@@ -1,0 +1,20 @@
+name: Inspect public AsiaLiveAction pages
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/inspect-site.js
+      - .github/workflows/inspect-site.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect two public HTML pages, no media access
+        run: node scripts/inspect-site.js

@@ -79,3 +79,11 @@ puente HTTP de Nuvio. Esto reduce el riesgo de cargar bytes de vídeo como HTML.
 **Límite:** no se garantiza que el destino sea reproducible sin una comprobación
 real; los hosts dinámicos protegidos siguen sin adaptador. Si el runtime ignora
 `redirect:manual`, podría descargar el cuerpo antes de devolver la respuesta.
+
+### Inspección HTTP del sitio (mantenimiento)
+
+`Inspect public AsiaLiveAction pages` en GitHub Actions ejecuta un
+chequeo no invasivo de la ficha pública de Oldboy y, solo si es accesible,
+de una página de reproductor. También puede iniciarse manualmente desde
+Actions. Solo publica códigos HTTP y nombres de hosts; `success` significa
+que la inspección se ejecutó, no que el vídeo funcione.

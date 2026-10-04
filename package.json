@@ -5,7 +5,7 @@
   "description": "Unofficial Nuvio provider for AsiaLiveAction",
   "scripts": {
     "test": "node --test test/provider.test.js",
-    "check": "node --check providers/asialiveaction.js && node --test test/provider.test.js",
+    "check": "node --check providers/asialiveaction.js && node --check scripts/inspect-site.js && node --test test/provider.test.js",
     "diagnose": "node scripts/diagnose.js"
   },
   "engines": {
