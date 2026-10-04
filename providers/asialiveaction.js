@@ -1,6 +1,6 @@
 /**
  * Asia Live Action provider for Nuvio
- * v0.1.5
+ * v0.1.6
  *
  * Evidence-based changes:
  * - Direct modern URL lookup by TMDB id before WordPress search.
@@ -82,46 +82,75 @@ function headers(referer, accept) {
   if (referer) h["Referer"] = referer;
   return h;
 }
+
+var MAX_REDIRECTS = 4;
+// The Nuvio fetch bridge buffers response bodies before returning them to JS.
+// Follow redirects manually so an embed's Location: .../video.m3u8 never
+// downloads the entire video into the plugin runtime.
 async function getPage(url, referer, ctx, json) {
-  if(ctx.stopped || Date.now()>=ctx.deadline || ctx.requests>=MAX_REQUESTS) {
-    record(ctx,"budget_exhausted"); return null;
+  var current=absoluteUrl(url,referer), from=referer, seen=Object.create(null);
+  if(!current) return null;
+  for(var hop=0;hop<=MAX_REDIRECTS;hop++) {
+    if(ctx.stopped||Date.now()>=ctx.deadline||ctx.requests>=MAX_REQUESTS) {
+      record(ctx,"budget_exhausted"); return null;
+    }
+    if(seen[current]) { record(ctx,"redirect_cycle",current); return null; }
+    seen[current]=true;
+    if(!json && mediaUrl(current)) return {url:current,body:"",directMedia:true,referer:from};
+    ctx.requests++;
+    var controller=typeof AbortController!=="undefined" ? new AbortController() : null;
+    var timer, timedOut=false;
+    var target=current;
+    var work=(async function() {
+      var options={headers:headers(from,json?"application/json":null),redirect:"manual"};
+      if(controller) options.signal=controller.signal;
+      var response=await fetch(target,options);
+      if(!response) { record(ctx,"network_error",target); return null; }
+      var responseUrl=absoluteUrl(response.url||target,target);
+      if(!responseUrl) { record(ctx,"invalid_redirect"); return null; }
+      var status=Number(response.status)||0, location=null, mime="";
+      try {
+        if(response.headers && typeof response.headers.get==="function") {
+          location=response.headers.get("location");
+          mime=String(response.headers.get("content-type")||"").toLowerCase();
+        }
+      } catch (_) {}
+      // Do not ask the native network bridge to fetch media URL targets.
+      if([301,302,303,307,308].indexOf(status)>=0) {
+        var next=absoluteUrl(location,responseUrl);
+        if(!next) { record(ctx,"invalid_redirect",responseUrl); return null; }
+        return {redirect:next,url:responseUrl};
+      }
+      if(!response.ok) {record(ctx,"http_error",responseUrl,status);return null;}
+      // Host runtimes which ignore redirect:manual can still report a final URL.
+      // This fallback avoids JS text parsing, but the host may already have buffered the body.
+      if(!json && mediaUrl(responseUrl) && !/(?:text\/html|application\/xhtml\+xml|application\/json)/.test(mime))
+        return {url:responseUrl,body:"",directMedia:true,referer:from};
+      var body=await response.text();
+      if(body.length>MAX_BODY_CHARS) {record(ctx,"body_too_large",responseUrl);return null;}
+      return {url:responseUrl,body:body};
+    })();
+    var page=null;
+    try {
+      if(typeof setTimeout!=="function") page=await work;
+      else page=await Promise.race([work,new Promise(function(resolve) {
+        timer=setTimeout(function() {
+          timedOut=true;ctx.stopped=true;
+          if(controller) controller.abort();
+          record(ctx,"request_timeout",target);resolve(null);
+        },Math.min(REQUEST_TIMEOUT_MS,Math.max(1,ctx.deadline-Date.now())));
+      })]);
+    } catch (_) {
+      if(!timedOut) record(ctx,"network_error",target);
+      return null;
+    } finally {if(timer && typeof clearTimeout==="function") clearTimeout(timer);}
+    if(!page) return null;
+    if(!page.redirect) return page;
+    from=page.url;
+    current=page.redirect;
   }
-  url=absoluteUrl(url,referer); if(!url) return null;
-  ctx.requests++;
-  var controller=typeof AbortController!=="undefined" ? new AbortController() : null;
-  var timer, timedOut=false;
-  var work=(async function() {
-    var options={headers:headers(referer,json?"application/json":null),redirect:"follow"};
-    if(controller) options.signal=controller.signal;
-    var response=await fetch(url,options);
-    if(!response || !response.ok) { record(ctx,"http_error",url,response&&response.status); return null; }
-    var finalUrl=absoluteUrl(response.url||url,url);
-    if(!finalUrl) { record(ctx,"invalid_redirect"); return null; }
-    var mime='';
-    try { mime=response.headers && typeof response.headers.get==='function' ?
-      String(response.headers.get('content-type')||'').toLowerCase() : ''; } catch (_) {}
-    // A redirected video is already a stream. Do not read a large media body as HTML.
-    // A .mp4/.m3u8 URL actually serving HTML is not a playable stream.
-    if(!json && mediaUrl(finalUrl) && !/(?:text\/html|application\/xhtml\+xml|application\/json)/.test(mime))
-      return {url:finalUrl,body:'',directMedia:true};
-    var body=await response.text();
-    if(body.length>MAX_BODY_CHARS) { record(ctx,"body_too_large",finalUrl); return null; }
-    return {url:finalUrl,body:body};
-  })();
-  try {
-    // Race also bounds runtimes whose fetch ignores AbortSignal (Nuvio QuickJS).
-    if(typeof setTimeout!=="function") return await work;
-    return await Promise.race([work,new Promise(function(resolve) {
-      timer=setTimeout(function(){
-        timedOut=true; ctx.stopped=true;
-        if(controller) controller.abort();
-        record(ctx,"request_timeout",url); resolve(null);
-      },Math.min(REQUEST_TIMEOUT_MS,Math.max(1,ctx.deadline-Date.now())));
-    })]);
-  } catch (_) {
-    if(!timedOut) record(ctx,"network_error",url);
-    return null;
-  } finally { if(timer && typeof clearTimeout==="function") clearTimeout(timer); }
+  record(ctx,"redirect_limit",current);
+  return null;
 }
 async function tmdbMeta(id, mediaType, ctx) {
   var key=tmdbKey(); if(!key) { record(ctx,"tmdb_key_missing"); return null; }
@@ -297,7 +326,7 @@ async function resolvePage(url,referer,depth,visited,ctx) {
   visited[url]=true;
   if(mediaUrl(url)) return [{url:url,referer:referer,type:typeFromUrl(url),quality:quality(url)}];
   var page=await getPage(url,referer,ctx); if(!page) return [];
-  if(page.directMedia) return [{url:page.url,referer:referer,type:typeFromUrl(page.url),quality:quality(page.url)}];
+  if(page.directMedia) return [{url:page.url,referer:page.referer||referer,type:typeFromUrl(page.url),quality:quality(page.url)}];
   var d=directMedia(page.body,page.url),out=[];
   for(var i=0;i<d.length;i++) out.push({url:d[i],referer:page.url,type:typeFromUrl(d[i]),quality:quality(d[i])});
   if(out.length) return out;
@@ -343,7 +372,7 @@ async function getStreams(tmdbId,mediaType,season,episode) {
 // Explicit diagnostics for maintainers; never disguised as playable video rows.
 async function diagnose(tmdbId,mediaType,season,episode) {
   var ctx=context(),streams=await lookup(tmdbId,mediaType,season,episode,ctx);
-  return {version:"0.1.5",streamCount:streams.length,requests:ctx.requests,events:ctx.events};
+  return {version:"0.1.6",streamCount:streams.length,requests:ctx.requests,events:ctx.events};
 }
 if(typeof module!=="undefined"&&module.exports) {
   module.exports={getStreams:getStreams,diagnose:diagnose,_test:{slugify:slugify,

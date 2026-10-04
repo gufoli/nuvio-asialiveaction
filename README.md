@@ -1,4 +1,4 @@
-# Asia Live Action — Nuvio 0.1.5
+# Asia Live Action — Nuvio 0.1.6
 
 Proveedor no oficial, sin dependencias. Busca por identidad TMDB y por temporada/episodio exactos.
 
@@ -12,7 +12,7 @@ https://raw.githubusercontent.com/gufoli/nuvio-asialiveaction/main/manifest.json
 
 Si vienes del repositorio de `man-zanilla`, elimina **solo ese repositorio** de Nuvio y añade la URL de `gufoli` indicada arriba. Actualizar la entrada antigua seguirá consultando la cuenta anterior.
 
-Si ya está instalado desde `gufoli`, actualizar el repositorio y comprobar que el proveedor muestra **0.1.5**.
+Si ya está instalado desde `gufoli`, actualizar el repositorio y comprobar que el proveedor muestra **0.1.6**.
 Si conserva 0.1.2, quitar únicamente este repositorio y añadir la misma URL de nuevo.
 No es necesario descargar ZIP, copiar código ni modificar GitHub.
 
@@ -68,3 +68,14 @@ Se rechazan cuerpos de más de 2 millones de caracteres después de leerlos; est
 el buffer que el host ya haya reservado. Sin timers del host, rige su timeout nativo.
 
 Ver [auditoría y evidencia](AUDIT.md) y [pruebas en dispositivo](TESTER.md).
+
+### Redirecciones (0.1.6)
+
+Las redirecciones HTTP se siguen manualmente con un máximo de cuatro saltos,
+rechazando destinos locales o con URL inválida. Cuando `Location` apunta
+directamente a un HLS/MP4, se entrega la URL sin pedir el cuerpo del vídeo al
+puente HTTP de Nuvio. Esto reduce el riesgo de cargar bytes de vídeo como HTML.
+
+**Límite:** no se garantiza que el destino sea reproducible sin una comprobación
+real; los hosts dinámicos protegidos siguen sin adaptador. Si el runtime ignora
+`redirect:manual`, podría descargar el cuerpo antes de devolver la respuesta.

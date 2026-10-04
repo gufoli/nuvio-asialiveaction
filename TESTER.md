@@ -1,4 +1,4 @@
-# Pruebas en Nuvio — 0.1.5
+# Pruebas en Nuvio — 0.1.6
 
 No hace falta tocar GitHub ni ejecutar comandos.
 
@@ -26,3 +26,5 @@ Ya no se sustituye esa película por falsos vídeos de diagnóstico.
 **Oldboy (2003), Android, 0.1.5:** el filtro Asia Live Action aparece durante la carga y desaparece al finalizar. Nuvio oculta los proveedores que terminan con cero streams. Esto confirma que el plugin está instalado y se ejecuta; el resultado actual para Oldboy es **0 fuentes reproducibles**.
 
 No hace falta repetir esta prueba hasta que se publique un extractor de host nuevo.
+
+**0.1.6:** corrección interna de redirecciones HTTP; todavía no hay extractores dinámicos verificados. No es necesario volver a comprobar Oldboy solo por esta versión.
