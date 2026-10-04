@@ -109,3 +109,20 @@ Prueba en dispositivo Android con **Oldboy (2003)** y Asia Live Action 0.1.5:
 - Estado real: integración Nuvio/manifest confirmada en dispositivo; extracción de los reproductores dinámicos de AsiaLiveAction sigue pendiente.
 
 No se añadirá una fila de diagnóstico falsa para mantener visible el filtro: solo se publicarán fuentes reproducibles reales.
+
+## Revisión técnica 0.1.6 — 2026-10-04
+
+Se ha inspeccionado el código público de NuvioMobile (FetchBridge.kt y
+JsBindings.kt, repositorio `NuvioMedia/NuvioMobile`): el puente de fetch
+materializa `response.bodyBytes` y su copia Base64 antes de entregar la
+respuesta a JavaScript. La detección de `.mp4` o `.m3u8` hecha **después**
+del `fetch` en 0.1.5 no prevenía ese consumo de memoria ante un 302.
+
+Corrección: seguir explícitamente HTTP 301/302/303/307/308 mediante
+`redirect:manual`; si Location ya es una ruta multimedia, entregarla sin
+otro GET. Limitar saltos (4), detectar ciclos y validar cada URL antes de
+solicitarla. Nuevas pruebas de redirección y regresión.
+
+**Limitaciones:** el comportamiento real de hosts dinámicos, la accesibilidad
+de la CDN, los redirects ignorados por el runtime, DRM y la reproducción en
+dispositivo siguen sin verificarse. No añadir reproductores falsos.

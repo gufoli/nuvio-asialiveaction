@@ -224,3 +224,48 @@ test('host validation rejects non-public or invalid URL authority',()=>{
   }
   assert.equal(helpers.absoluteUrl('https://cdn.example:8443/v.m3u8',BASE),'https://cdn.example:8443/v.m3u8');
 });
+
+test('HTTP Location redirects from embeds to video are not fetched as binary', async()=>{
+  const r=routes();
+  const hls='https://cdn.example/movie/master.m3u8?token=secret';
+  r[player]={status:302,headers:{get:(name)=>name==='location'?hls:null},body:''};
+  const {p,calls}=runtime(r);
+  const found=await p.getStreams('670','movie');
+  assert.equal(found.length,1);
+  assert.equal(found[0].url,hls);
+  assert.equal(found[0].headers.Referer,player);
+  assert.ok(!calls.some(c=>c.url===hls),'binary target must never be requested');
+  assert.equal(calls.find(c=>c.url===player).init.redirect,'manual');
+});
+test('relative HTML redirect retains exact identity and bounded requests',async()=>{
+  const r=routes();
+  const next=BASE+'/pelicula/670-oldboy-otra/';
+  r[detail]={status:302,headers:{get:n=>n==='location'?'/pelicula/670-oldboy-otra/':null}};
+  r[next]='<a href="/f/1/670/0018111/">play</a>';
+  const {p,calls}=runtime(r);
+  assert.equal((await p.getStreams('670','movie')).length,1);
+  assert.ok(calls.some(c=>c.url===next));
+});
+test('redirects to internal addresses and redirect cycles fail safely',async()=>{
+  for(const location of ['http://192.168.1.4/movie.m3u8','http://host.internal/film.mp4',player]) {
+    const r=routes();
+    r[player]={status:302,headers:{get:n=>n==='location'?location:null}};
+    const {p,calls}=runtime(r);
+    assert.equal((await p.getStreams('670','movie')).length,0);
+    assert.ok(calls.length<=18);
+    assert.ok(!calls.some(c=>c.url===location && location!==player));
+  }
+});
+test('deep redirect chains stop within redirect budget',async()=>{
+  const r=routes();let url=player;
+  for(let i=0;i<8;i++){
+    const next='https://player.example/redirect-'+i;
+    r[url]={status:302,headers:{get:n=>n==='location'?next:null}};
+    url=next;
+  }
+  const {p,calls}=runtime(r);
+  const result=await p.diagnose('670','movie');
+  assert.equal(result.streamCount,0);
+  assert.ok(result.events.some(e=>e.code==='redirect_limit'));
+  assert.ok(calls.length<=18);
+});
