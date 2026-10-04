@@ -28,3 +28,21 @@ Ya no se sustituye esa película por falsos vídeos de diagnóstico.
 No hace falta repetir esta prueba hasta que se publique un extractor de host nuevo.
 
 **0.1.6:** corrección interna de redirecciones HTTP; todavía no hay extractores dinámicos verificados. No es necesario volver a comprobar Oldboy solo por esta versión.
+
+
+## Próxima prueba — 0.1.7
+
+La variante nativa `kino/` no se prueba ahora: requiere apiVersion 6 y la versión pública actual de
+Kino admite hasta apiVersion 5.
+
+0.1.7 añade el primer adaptador dinámico real, **Byse AES-GCM**, usando WebCrypto que ya trae Nuvio.
+Cuando esta versión esté fusionada y CI esté verde, basta una sola prueba:
+
+1. Actualiza el repositorio `gufoli/nuvio-asialiveaction` en Nuvio y confirma **0.1.7**.
+2. Abre **Oldboy (2003)**.
+3. Busca fuentes y comprueba si **Asia Live Action** permanece después de terminar la carga.
+4. Si aparece una fuente, ábrela y confirma únicamente: arranca vídeo, hay audio y puedes avanzar
+   aproximadamente un minuto.
+
+Si sigue desapareciendo, envía una captura. Eso significará que Oldboy no está entrando por Byse en
+ese momento o que el contrato real del host cambió; no hace falta repetir otras películas todavía.
