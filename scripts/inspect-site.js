@@ -36,7 +36,7 @@ function hosts(urls){
   }).filter(h=>h&&h!== 'asialiveaction.com'&&h!== 'www.asialiveaction.com'&&!seen.has(h)&&seen.add(h));
 }
 const output={site:'Asia Live Action',content:'Oldboy (2003)',detailHttp:0,detailFound:false,
-  playerHttp:0,playerFound:false,publicVideoHosts:[],directMediaCount:0,sitePlayable:false};
+  playerHttp:0,playerFound:false,publicVideoHosts:[],directMediaCount:0,playbackVerified:false};
 const d=downloadHtml(DETAIL);
 output.detailHttp=d.status;
 if(d.accessible){
