@@ -1,0 +1,30 @@
+name: Verify Kino companion
+on:
+  push:
+    paths:
+      - 'kino/**'
+      - '.github/workflows/kino-verify.yml'
+  pull_request:
+    paths:
+      - 'kino/**'
+      - '.github/workflows/kino-verify.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run companion behavior tests
+        run: node --test kino/test/plugin.test.mjs
+      - name: Checkout pinned official Kino SDK
+        uses: actions/checkout@v4
+        with:
+          repository: kinotvapp/kino-plugin-archive
+          ref: f8be143033bb18035adf4d871554506a67cbfaba
+          path: .kino-sdk
+      - name: Validate manifest and contract with Kino 0.9.50 SDK
+        run: node .kino-sdk/sdk/validate.mjs kino

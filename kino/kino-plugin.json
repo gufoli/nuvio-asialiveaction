@@ -1,0 +1,24 @@
+{
+  "id": "asialiveaction-native",
+  "name": "Asia Live Action",
+  "version": "0.1.0",
+  "apiVersion": 6,
+  "entry": "plugin.js",
+  "description": "Proveedor no oficial para Kino. Busca películas de Asia Live Action y usa el navegador oculto del dispositivo para encontrar el video sin ejecutar JavaScript remoto dentro del plugin.",
+  "author": "gufoli",
+  "hosts": [
+    "asialiveaction.com",
+    "*.asialiveaction.com"
+  ],
+  "streamHosts": "any",
+  "capabilities": [
+    "search",
+    "resolve"
+  ],
+  "categories": [
+    "movies"
+  ],
+  "browser": "pages",
+  "debug": true,
+  "color": "#B3261E"
+}
