@@ -174,3 +174,44 @@ Se revisó la documentación actual de `kinotvapp/kino-plugins`, el plugin Cueva
 
 Evidencia automatizada: 7/7 pruebas de comportamiento y validación con el SDK oficial sincronizado
 con Kino 0.9.50: **“Kino would accept this plugin”**. Pendiente real: WebView/reproducción en dispositivo.
+
+
+## Corrección 0.1.7 — Byse AES-GCM y compatibilidad real de Kino
+
+La captura del dispositivo al intentar instalar `kino/` mostró
+`Este plugin necesita una versión más nueva de Kino`. Se comprobó contra el repositorio público
+`kinotvapp/kino-light`: la versión pública actual admite hasta **apiVersion 5**. La documentación
+separada `kinotvapp/kino-plugins` ya describe apiVersion 6 / Kino 0.9.50, pero esa capacidad todavía
+no debe tratarse como disponible en la app estable. La variante nativa `kino/` queda archivada como
+ruta futura y no se pide al tester instalarla ahora.
+
+Para avanzar sin depender de apiVersion 6 se revisaron implementaciones actuales de AsiaLiveAction y
+del host Byse. Referencias selectivas y licencias comprobadas:
+
+- `johnneerdael/nexio-nagare`, extractor Byse — licencia MIT.
+- `yuzono/anime-extensions`, extensión AsiaLiveAction — licencia Apache-2.0.
+- `dotjarden/NuvioMobile`, runtime de plugins — GPL-3.0; se usó solo para confirmar capacidades
+  públicas del runtime, no se copió su código.
+
+Hallazgo técnico: Byse entrega un objeto `playback` cifrado con AES-256-GCM. Las partes de la clave,
+el IV y el payload llegan en la propia respuesta pública del player. El runtime Nuvio Full ya expone
+`crypto.subtle.importKey/decrypt` respaldado por AES-GCM nativo en Android. Por tanto, no hace falta
+ejecutar JavaScript remoto ni usar `eval`.
+
+0.1.7 añade un adaptador acotado que:
+
+- solo se activa sobre URLs `/e/<id>` con evidencia de Byse;
+- intenta el endpoint directo `/api/videos/<id>/`;
+- soporta también `embed/details → embed/playback`;
+- valida clave de 32 bytes, IV de 12 bytes y payload con etiqueta GCM;
+- descifra con `crypto.subtle` y acepta únicamente fuentes multimedia HTTP(S) válidas;
+- conserva Referer/Origin para el reproductor;
+- nunca descarga la URL HLS/MP4 como cuerpo dentro del scraper;
+- falla cerrado ante JSON, criptografía o URL inválidos.
+
+La implementación es propia a partir del contrato observable; no se copiaron funciones de los
+repositorios de referencia. UPN, RPM y Ezplayer continúan sin adaptador específico.
+
+**Estado antes de prueba de dispositivo:** compilado/sintaxis y pruebas automatizadas pendientes de
+la ejecución CI de esta rama. **Reproducción real:** pendiente; no se declara Oldboy funcional hasta
+que vídeo y audio arranquen en Nuvio.
